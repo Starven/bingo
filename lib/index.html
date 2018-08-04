@@ -1,0 +1,92 @@
+<html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="style.css">
+        </head>
+        <body>
+
+            <div class="container">
+
+
+            <!--
+
+                Containers
+
+                Username
+            -->
+
+            <div class="home-screen-container" id="login-container">
+                <input id="username-input" type="text" placeholder = "Username">
+                <div class="button" onClick='onUsername()'>
+                    <h2>Play</h2>
+                </div>
+
+            </div>
+
+            <!--
+
+                Containers
+
+                Play Screen - Create Game/Join Game
+            -->
+
+                <div class="home-screen-container hidden" id="create-join-container">
+                    <div class="create-game-div">
+                        <div class="button" id="creategamebutton" onclick="listScreen()">
+                            <h2>Create Game</h2> 
+                        </div>
+                    </div>
+
+                    <hr><p></p>
+
+                    <div class="join-game-div">
+                        <input id="roomCode" type="text" placeholder="Join Game">
+                        <div class="button" id="joingamebutton" onclick="joinGame()">
+                            <h2> Join Game</h2>
+                        </div>
+                    </div>
+                </div> 
+
+            </div>
+
+             <!--
+
+                Containers
+
+                List Selection and Prize Screen
+
+            -->
+
+            <div class="home-screen-container hidden" id="list-screen-container">
+                <div class="button"><h2>Number List</h2></div>
+                <p></p>
+                <br>
+                <input type="text" placeholder="Prize">
+                <div class="button" id="creategamebutton" onclick="createGame()"></div>
+            </div>
+
+            <!--
+
+                Containers
+
+                Game Screen
+
+            -->
+
+            <div class="game-screen-container hidden" id="game-screen-container">
+                <canvas id="canvas" height="500" width="500"></canvas>
+            </div>
+
+        
+        
+        <!-- 
+        
+            Scripts
+        
+        -->
+            <script src="/socket.io/socket.io.js"></script>
+            <script src="./Components/Game.js"></script>
+            
+
+        </body>
+</html>
