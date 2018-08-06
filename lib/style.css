@@ -28,6 +28,32 @@
     position: relative;
 }
 
+.choice {
+    position: relative;
+    width: 90%;
+    height: auto;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.choice:hover{
+    cursor: pointer;
+    background-color: lightgreen;
+    color: white;
+}
+
+.selected {
+    border: 5px solid green;
+    background-color: lightgreen;
+    color: white;
+}
+
+.not_selected {
+    border: 5px solid transparent;
+    background-color: gray;
+    color: white;
+}
+
 .create-game-div {
     width: 200px;
     height: 100px;
@@ -45,7 +71,7 @@
     margin: 0 auto;
 }
 
-#roomcode, #username-input{
+#roomcode, #username-input, #prize{
     position: relative;
     margin: 0 auto;
     width: 100%;

@@ -19,9 +19,9 @@ class Board {
     
             let win = false;
     
-            for (let h=0;h<5;h++) {
+            for (let h=0;h<this.BOARD_WIDTH;h++) {
                 let w=true;
-                for (let x=0;x<5;x++) {
+                for (let x=0;x<this.BOARD_HEIGHT;x++) {
                     let tile = getTile(h, x)
                     if(!tile.CROSSED) {
                         w = false;
@@ -33,9 +33,9 @@ class Board {
                 }
             }
     
-            for (let v=0;v<5;v++) {
+            for (let v=0;v<this.BOARD_HEIGHT;v++) {
                 let w=true;
-                for (let y=0;y<5;y++) {
+                for (let y=0;y<this.BOARD_WIDTH;y++) {
                     let tile = getTile(y, v)
                     if(!tile.CROSSED) {
                         w = false;
@@ -66,15 +66,8 @@ class Board {
 
         for (let x=0;x<this.BOARD_WIDTH;x++) {
             for (let y=0;y<this.BOARD_HEIGHT;y++) {
-
-                if (count == 12) {
-                    this.BOARD.push(new Tile("", x, y));
-                } else {
-                    this.BOARD.push(new Tile(this.tileList[count], x, y));
-                }
-
+                this.BOARD.push(new Tile(this.tileList[count], x, y));
                 count++;
-
             }
         }
 

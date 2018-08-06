@@ -8,7 +8,7 @@ var app = express();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
 
-const PORT = 3000;
+const PORT = 3001;
 
 app.use(express.static(__dirname));
 
@@ -25,6 +25,13 @@ http.listen(PORT, function(){
 var users = [];
 var sessions = [];
 
+var maxCreationAttempts = 100;
+
+var alphArray = [ "A", "B", "C", "D", "E", "F",
+"G", "H", "I", "J", "K", "L",
+"M", "N", "O", "P", "Q", "R",
+"S", "T", "U", "V", "W", "X", "Y", "Z"];
+
 //Socket Work
 
 var userCount = 0;
@@ -34,6 +41,8 @@ io.on('connection', function(socket) {
     userCount+=1;
     var You = {};
     var roomCode = "";
+    var gameWon = false;
+    var gameWinner = {};
 
     socket.on('create_user', function(username) {
         users.push(new User(userID, username));
@@ -42,14 +51,29 @@ io.on('connection', function(socket) {
         console.log("Created ID: " + userID + ", User " + username);
     })
 
-    socket.on('create_room', function() {
+    socket.on('create_room', function(size) {
 
-        roomCode = "01";
-        socket.join(roomCode);
+        let roomdupe = false;
 
-        sessions.push(new Session(roomCode, [You]));
-        console.log(sessions[sessions.length-1]);
-        io.in(roomCode).emit('new_game', sessions[sessions.length-1], You);
+        for (let g=0;g<maxCreationAttempts;g++) {
+            roomCode = generateRoomCode();
+            for (let sr=0;sr<sessions.length;sr++) {
+                if (roomCode == sessions[sr].ROOM_CODE) {
+                    roomdupe = true;
+                }
+            }
+        }
+        
+        if (!roomdupe) {
+            socket.join(roomCode);
+
+            sessions.push(new Session(roomCode, [You], size, "DuckGame"));
+            console.log(sessions[sessions.length-1]);
+            io.in(roomCode).emit('new_game', sessions[sessions.length-1], You);
+        }
+
+        //roomCode = "01";
+        
 
     })
 
@@ -58,9 +82,11 @@ io.on('connection', function(socket) {
         roomCode = rc;
 
         let s = getSessionByRoomCode(rc);
-        console.log("Adding Player to Session " + s + " with Username: " + You.USERNAME);
-        //sessions[s].addPlayer(You);
-        addPlayerToSession(sessions[s], You);
+        if (s != null && s != undefined) {
+            console.log("Adding Player to Session " + s + " with Username: " + You.USERNAME);
+            addPlayerToSession(sessions[s], You);
+        }
+        
         
 
     })
@@ -71,27 +97,166 @@ io.on('connection', function(socket) {
         //sessions[s].checkWin();
         if (checkWin(sessions[s])) {
             sessions[s].GAME_WON = true;
+            let winner = getPlayerWon(sessions[s]);
+            sessions[s].WINNER = winner;
+            io.in(roomCode).emit('game_won', sessions[s]);
+            console.log("Game Won By: " + winner.USERNAME);
+        } else {
+            io.in(roomCode).emit('session_updated', sessions[s]);
         }
-        socket.to(roomCode).emit('session_updated', sessions[s]);
+        
+    })
+
+    socket.on('restart_game', function() {
+        let s = getSessionByRoomCode(roomCode);
+
+        if (sessions[s] != null && sessions[s] != undefined) {
+            sessions[s].BOARDS = [];
+            sessions[s].GAME_WON = false;
+            sessions[s].WINNER = {};
+            for (let p=0;p<sessions[s].PLAYERS.length;p++) {
+                sessions[s].BOARDS.push(new Board(roomCode, sessions[s].TILE_LIST, sessions[s].BOARD_SIZE, sessions[s].BOARD_SIZE, sessions[s].PLAYERS[p]));
+            }
+        }
+
+        io.in(roomCode).emit('session_updated', sessions[s]);
     })
 
     socket.on('disconnect', function() {
         let s = getSessionByRoomCode(roomCode);
-        for (let p=0;p<sessions[s].PLAYERS.length;p++) {
-            if (sessions[s].PLAYERS[p].USERNAME === You.USERNAME) {
-                sessions[s].PLAYERS.splice(p, 1);
+
+        if (s != null && s != undefined) {
+
+            for (let p=0;p<sessions[s].PLAYERS.length;p++) {
+                if (sessions[s].PLAYERS[p].USERNAME === You.USERNAME) {
+                    sessions[s].PLAYERS.splice(p, 1);
+                }
             }
+    
+            socket.to(roomCode).emit('session_updated', sessions[s]);
         }
-
-        socket.to(roomCode).emit('session_updated', sessions[s]);
-
 
     })
 
+    socket.on('disconnect_game', function() {
+        let s = getSessionByRoomCode(roomCode);
+
+        let hostDisconnect = false;
+
+        if (s != null && s != undefined) {
+
+            for (let p=0;p<sessions[s].PLAYERS.length;p++) {
+                if (sessions[s].PLAYERS[p].USERNAME === You.USERNAME) {
+                    if (sessions[s].PLAYER_HOST.USERNAME == You.USERNAME) {
+                        hostDisconnect = true;
+                        console.log("Host Disconnected");
+                    }
+                    sessions[s].PLAYERS.splice(p, 1);
+                }
+            }
+
+            if (!hostDisconnect) {
+                for (let b=0;b<sessions[s].BOARDS.length;b++) {
+                    if (sessions[s].BOARDS[b].OWNER.USERNAME === You.USERNAME) {
+                        sessions[s].BOARDS.splice(b, 1);
+                    }
+                }
+            }
+            
+    
+            
+            if (!hostDisconnect) {
+                socket.to(roomCode).emit('session_updated', sessions[s]);
+                socket.emit("disconnected_game");
+            } else {
+                sessions[s] = {};
+                io.in(roomCode).emit('session_updated', sessions[s]);
+                io.in(roomCode).emit("disconnected_game");
+            }
+
+            socket.leave(roomCode);
+            roomCode = "";
+            
+        }
+    })
+
+    function generateRoomCode() {
+
+        let first = "";
+        let second = "";
+        let third = "";
+        let fourth = "";
+        let r = Math.floor(Math.random() * Math.floor(2));
+        if (r >= 1) {
+            first = Math.floor(Math.random() * Math.floor(10)).toString();
+        }
+        else {
+            let nfirst = Math.floor(Math.random() * Math.floor(26));
+            first = alphArray[nfirst];
+        }
+        r = Math.floor(Math.random() * Math.floor(2));
+        if (r >= 1) {
+            second = Math.floor(Math.random() * Math.floor(10)).toString();
+        }
+        else {
+            let nsecond = Math.floor(Math.random() * Math.floor(26));
+            second = alphArray[nsecond];
+        }
+        r = Math.floor(Math.random() * Math.floor(2));
+        if (r >= 1) {
+            third = Math.floor(Math.random() * Math.floor(10)).toString();
+        }
+        else {
+            let nthird = Math.floor(Math.random() * Math.floor(26));
+            third = alphArray[nthird];
+        }
+        r = Math.floor(Math.random() * Math.floor(2));
+        if (r >= 1) {
+            fourth = Math.floor(Math.random() * Math.floor(10)).toString();
+        }
+        else {
+            let nfourth = Math.floor(Math.random() * Math.floor(26));
+            fourth = alphArray[nfourth];
+        }
+
+        let concat = first + second + third + fourth;
+        return concat;
+
+        console.log(concat);
+
+    }
+
     function addPlayerToSession(session, player) {
 
-        session.PLAYERS.push(player);
-        session.BOARDS.push(new Board(roomCode, session.TILE_LIST, 5, 5, player));
+        //check for duplicate player names
+
+        let dupes = false;
+        let index = 0;
+        for (let p=0;p<session.PLAYERS.length;p++) {
+
+            if (session.PLAYERS[p].USERNAME === player.USERNAME) {
+                dupes = true;
+                index = p;
+            }
+
+        }
+
+        if (dupes) {
+            
+            for (let b=0;b<session.BOARDS.length;b++) {
+                if (session.BOARDS[b].OWNER.USERNAME == session.PLAYERS[index].USERNAME) {
+                    session.BOARDS[b].OWNER = player;
+                }
+            }
+
+            session.PLAYERS.splice(index, 1);
+            session.PLAYERS.push(player);
+        }
+        else {
+            session.PLAYERS.push(player);
+            session.BOARDS.push(new Board(roomCode, session.TILE_LIST, session.BOARD_SIZE, session.BOARD_SIZE, player));
+        }
+       
 
         socket.emit('new_game', session, You);
         socket.to(roomCode).emit('player_joined', session);
@@ -114,6 +279,14 @@ io.on('connection', function(socket) {
         }
     }
 
+    function getPlayerWon(session) {
+        for (let b=0;b<session.BOARDS.length;b++) {
+            if (checkBoardForWin(session.BOARDS[b])) {
+                return session.BOARDS[b].OWNER;
+            }
+        }
+    }
+
     function getTile(x, y, board) {
         
         for (let t=0;t<board.BOARD.length;t++) {
@@ -126,12 +299,12 @@ io.on('connection', function(socket) {
     function checkBoardForWin(board) {
         let win = false;
 
-        console.log(board);
+        console.log("BRD: " + board.BOARD_WIDTH);
     
-            for (let h=0;h<5;h++) {
+            for (let h=0;h<board.BOARD_WIDTH;h++) {
                 let w=true;
-                for (let x=0;x<5;x++) {
-                    let tile = getTile(h, x, board)
+                for (let x=0;x<board.BOARD_WIDTH;x++) {
+                    let tile = getTile(h, x, board);
                     if(!tile.CROSSED) {
                         w = false;
                     }
@@ -147,10 +320,10 @@ io.on('connection', function(socket) {
                 
             }
     
-            for (let v=0;v<5;v++) {
+            for (let v=0;v<board.BOARD_WIDTH;v++) {
                 let w=true;
-                for (let y=0;y<5;y++) {
-                    let tile = getTile(y, v, board)
+                for (let y=0;y<board.BOARD_WIDTH;y++) {
+                    let tile = getTile(y, v, board);
                     if(!tile.CROSSED) {
                         w = false;
                     }
@@ -164,6 +337,34 @@ io.on('connection', function(socket) {
                 }
     
                 
+            }
+
+            let w = true;
+            for (let d=0;d<board.BOARD_WIDTH;d++) {
+                let tile = getTile(d, d, board);
+                if (!tile.CROSSED) {
+                    w = false;
+                }
+            }
+
+            if(w) {
+                win = true;
+                console.log("Someone Won!");
+            }
+
+            w = true;
+            let count = 0;
+            for (let d=board.BOARD_WIDTH-1;d>=0;d--) {
+                let tile = getTile(d, count, board);
+                if (!tile.CROSSED) {
+                    w = false;
+                }
+                count++;
+            }
+
+            if(w) {
+                win = true;
+                console.log("Someone Won!");
             }
     
             return win;
